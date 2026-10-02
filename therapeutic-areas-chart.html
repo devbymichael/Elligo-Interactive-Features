@@ -1,0 +1,544 @@
+<style>
+  .ellmain-thera-widget {
+    --ellmain-thera-ink: #241a22;
+    --ellmain-thera-page-bg: #ffffff;
+  }
+  .ellmain-thera-widget,
+  .ellmain-thera-widget *,
+  .ellmain-thera-widget *::before,
+  .ellmain-thera-widget *::after { box-sizing: border-box; }
+
+  .ellmain-thera-widget {
+    margin: 0;
+    padding: 0 0 40px 0;
+    background: var(--ellmain-thera-page-bg);
+    color: var(--ellmain-thera-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  .ellmain-thera-wrap {
+    max-width: 650px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .ellmain-thera-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  /* ---------- Chart ---------- */
+  .ellmain-thera-chart-col {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    position: relative;
+  }
+
+  .ellmain-thera-chart-col svg {
+    width: 100%;
+    height: auto;
+    max-width: 600px;
+    overflow: visible;
+  }
+
+  /* Modal sits over the chart at a fraction of its width, so a margin of
+     the donut is always still visible on either side. Height is
+     content-sized (not forced full-height), so the top/bottom of the ring
+     peeks through too. */
+  .ellmain-thera-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 70%;
+    max-height: 82%;
+    transform: translate(-50%, -50%) scale(0.96);
+    display: flex;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 5;
+  }
+
+  .ellmain-thera-modal.ellmain-thera-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .ellmain-thera-modal-card {
+    width: 100%;
+    max-height: 100%;
+    overflow: auto;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 28px 32px;
+    box-shadow: 0 14px 44px rgba(20, 10, 20, 0.22);
+    position: relative;
+  }
+
+  .ellmain-thera-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: #6b5c66;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .ellmain-thera-modal-close:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  .ellmain-thera-modal-title {
+    margin: 0 0 16px;
+    padding-right: 28px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ellmain-thera-ink);
+  }
+
+  .ellmain-thera-modal-list {
+    margin: 0;
+    padding-left: 20px;
+    /* Webflow (and most site resets) strip list-style off every <ul> by
+       default, so this has to be set explicitly rather than relying on
+       the browser default — otherwise the bullets silently disappear
+       once this is embedded on the actual page. */
+    list-style: disc outside;
+  }
+
+  .ellmain-thera-modal-list li {
+    display: list-item;
+    font-size: 15px;
+    color: #3a2e37;
+    margin-bottom: 10px;
+  }
+
+  .ellmain-thera-modal-list li:last-child {
+    margin-bottom: 0;
+  }
+
+  .ellmain-thera-segment {
+    cursor: pointer;
+  }
+
+  /* Only the outer edge pushes outward on hover — the inner edge stays
+     pinned to the inner circle. Each path carries its own pre-built
+     "grown" outline (same inner radius, larger outer radius) as a CSS
+     custom property, swapped in on .ellmain-thera-active. */
+  .ellmain-thera-segment path {
+    transition: d 0.2s ease;
+  }
+
+  .ellmain-thera-segment.ellmain-thera-active path {
+    d: var(--ellmain-thera-d-active);
+  }
+
+  .ellmain-thera-leader-text {
+    font-size: 18px;
+    fill: var(--ellmain-thera-ink);
+    font-weight: 600;
+  }
+
+  /* ---------- Legend ---------- */
+  /* 3 columns by default (17 items / 6 rows). Column count is stepped down
+     with plain @media breakpoints below, computed from the actual layout
+     geometry (chart width + gaps) at each viewport range so the columns
+     never need more width than the legend actually has to give — nothing
+     gets clipped. */
+  .ellmain-thera-legend-col {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(6, auto);
+    column-gap: 32px;
+    row-gap: 5px;
+    justify-content: center;
+  }
+
+  .ellmain-thera-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 0;
+  }
+
+  .ellmain-thera-legend-dot {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    flex: none;
+    transition: transform 0.18s ease;
+  }
+
+  /* Only on an actual click-selection (not plain hover) — kept separate
+     from .ellmain-thera-active, which just drives the hover
+     cross-highlight. */
+  .ellmain-thera-legend-item.ellmain-thera-selected .ellmain-thera-legend-dot {
+    transform: scale(1.2);
+  }
+
+  .ellmain-thera-legend-label {
+    font-size: 16px;
+    color: var(--ellmain-thera-ink);
+  }
+
+  /* ---------- Responsive ---------- */
+  /* Chart is always on top and the legend always below (single column,
+     capped at 650px total). The legend steps from 3 columns down to 2 as
+     the page narrows, and holds at 2 columns all the way down through
+     mobile widths (never drops to a single column). */
+  @media (max-width: 639px) {
+    .ellmain-thera-legend-col {
+      grid-template-rows: repeat(9, auto);
+    }
+  }
+
+  /* Desktop only: graph is reduced 10% twice (600px -> 540px -> 486px).
+     Everything below this breakpoint (tablet/mobile) is unaffected. */
+  @media (min-width: 1025px) {
+    .ellmain-thera-chart-col svg {
+      max-width: 486px;
+    }
+  }
+
+  /* Modal width: mobile default is 70% (set above), then narrows to 60%
+     on tablet and 50% on desktop. */
+  @media (min-width: 768px) and (max-width: 1024px) {
+    .ellmain-thera-modal {
+      width: 60%;
+    }
+  }
+  @media (min-width: 1025px) {
+    .ellmain-thera-modal {
+      width: 50%;
+    }
+  }
+</style>
+
+<div class="ellmain-thera-widget" id="ellmainTheraWidget">
+  <div class="ellmain-thera-wrap">
+    <div class="ellmain-thera-grid">
+      <div class="ellmain-thera-chart-col" id="ellmainTheraChartCol">
+        <svg id="ellmainTheraChartSvg" viewBox="78 58 592 600"></svg>
+
+        <div class="ellmain-thera-modal" id="ellmainTheraModal">
+          <div class="ellmain-thera-modal-card" id="ellmainTheraModalCard">
+            <button class="ellmain-thera-modal-close" id="ellmainTheraModalClose" type="button" aria-label="Close">&times;</button>
+            <h3 class="ellmain-thera-modal-title" id="ellmainTheraModalTitle"></h3>
+            <ul class="ellmain-thera-modal-list" id="ellmainTheraModalList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="ellmain-thera-legend-col" id="ellmainTheraLegendCol"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Data in clockwise order starting at 12 o'clock, matching the reference chart.
+  const data = [
+    { id: "allergy",      label: "Allergy / Immunology", percent: 1,  color: "#ef3e45" },
+    { id: "cardiology",   label: "Cardiology",            percent: 2,  color: "#f06432" },
+    { id: "ophtalmology", label: "Ophtalmology",          percent: 2,  color: "#ee8124" },
+    { id: "pediatrics",   label: "Pediatrics",            percent: 2,  color: "#f29f13" },
+    { id: "rheumatology", label: "Rheumatology",          percent: 2,  color: "#ffc415" },
+    { id: "dermatology",  label: "Dermatology",           percent: 3,  color: "#d8ca2d" },
+    { id: "gastro",       label: "Gastrointestinal",      percent: 3,  color: "#8abb58" },
+    { id: "hematology",   label: "Hematology",            percent: 3,  color: "#50b9a8" },
+    { id: "pain",         label: "Pain / Inflammation",   percent: 5,  color: "#3caed7" },
+    { id: "pulmonology",  label: "Pulmonology",           percent: 5,  color: "#56a8cf" },
+    { id: "infectious",   label: "Infectious Disease",    percent: 6,  color: "#8fa3c0" },
+    { id: "psychiatry",   label: "Psychiatry",            percent: 6,  color: "#896983" },
+    { id: "endocrine",    label: "Endocrine / Metabolic", percent: 9,  color: "#72203f" },
+    { id: "rare",         label: "Rare Disease",          percent: 9,  color: "#571550" },
+    { id: "oncology",     label: "Oncology",              percent: 16, color: "#35005b" },
+    { id: "cns",          label: "CNS, Neurology",        percent: 19, color: "#210033" },
+    { id: "others",       label: "Others",                percent: 8,  color: "#aa294d" }
+  ];
+
+  // Legend items are rendered in this same order below. With
+  // grid-auto-flow: column, the grid fills each column top-to-bottom before
+  // starting the next one, so this order reproduces the reference's
+  // column grouping at 3 columns and reflows cleanly at 2.
+
+  const byId = Object.fromEntries(data.map(d => [d.id, d]));
+
+  const root = document.getElementById("ellmainTheraWidget");
+
+  // ---------- Geometry ----------
+  const cx = 360, cy = 360;
+  const outerR = 225;
+  const innerR = 156; // ring-thickness ratio matches the reference (hole/outer = 0.69)
+  const gapDeg = 1.5; // fixed angular gap, identical for every segment
+  const total = data.reduce((s, d) => s + d.percent, 0);
+
+  function polar(cxx, cyy, radius, angleDeg) {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cxx + radius * Math.cos(rad), y: cyy + radius * Math.sin(rad) };
+  }
+
+  // Build a true annular-sector path with rounded corners (proper fillets,
+  // not a stroke hack) so the corner radius doesn't expand the ring or eat
+  // into the gap between neighboring segments.
+  const CORNER_R = 10;
+  function roundedWedgePath(startAngle, endAngle, rOuter, rInner, desiredCr) {
+    const spanDeg = endAngle - startAngle;
+    const spanRad = (spanDeg * Math.PI) / 180;
+    const cr = Math.min(desiredCr, (rOuter - rInner) / 2, (rInner * spanRad) / 2 * 0.9);
+    const dOuterDeg = (cr / rOuter) * (180 / Math.PI);
+    const dInnerDeg = (cr / rInner) * (180 / Math.PI);
+
+    const p1 = polar(cx, cy, rOuter, startAngle + dOuterDeg);
+    const p2 = polar(cx, cy, rOuter, endAngle - dOuterDeg);
+    const p3 = polar(cx, cy, rOuter - cr, endAngle);
+    const p4 = polar(cx, cy, rInner + cr, endAngle);
+    const p5 = polar(cx, cy, rInner, endAngle - dInnerDeg);
+    const p6 = polar(cx, cy, rInner, startAngle + dInnerDeg);
+    const p7 = polar(cx, cy, rInner + cr, startAngle);
+    const p8 = polar(cx, cy, rOuter - cr, startAngle);
+
+    const largeArc = spanDeg > 180 ? 1 : 0;
+
+    return (
+      `M ${p1.x} ${p1.y} ` +
+      `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p2.x} ${p2.y} ` +
+      `A ${cr} ${cr} 0 0 1 ${p3.x} ${p3.y} ` +
+      `L ${p4.x} ${p4.y} ` +
+      `A ${cr} ${cr} 0 0 1 ${p5.x} ${p5.y} ` +
+      `A ${rInner} ${rInner} 0 ${largeArc} 0 ${p6.x} ${p6.y} ` +
+      `A ${cr} ${cr} 0 0 1 ${p7.x} ${p7.y} ` +
+      `L ${p8.x} ${p8.y} ` +
+      `A ${cr} ${cr} 0 0 1 ${p1.x} ${p1.y} Z`
+    );
+  }
+
+  // On hover/active, only the outer edge pushes out — the inner edge stays
+  // pinned to the inner circle. Regenerating the wedge with a larger outer
+  // radius (same inner radius) does that directly, rather than scaling the
+  // whole shape from the center.
+  const GROW_AMOUNT = 16;
+
+  // Every leader line is the same fixed length.
+  const LEADER_LEN = 35;
+  const TEXT_GAP = 28; // extra distance from the dot to the label text
+
+  let cumulative = 0;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("ellmainTheraChartSvg");
+
+  data.forEach((d) => {
+    const startPct = cumulative;
+    const endPct = cumulative + d.percent;
+    cumulative = endPct;
+
+    const startAngleFull = (startPct / total) * 360;
+    const endAngleFull = (endPct / total) * 360;
+    const midAngle = (startAngleFull + endAngleFull) / 2;
+
+    // Inset the segment by exactly half of the fixed gap on each side, so
+    // every seam around the circle has the identical angular width — the
+    // gap never scales with the segment's percentage. Only the tiny 1%
+    // slice is capped (it's narrower than the gap itself) so it doesn't
+    // invert; every other segment gets the exact same gap.
+    const fullAngle = endAngleFull - startAngleFull;
+    const effectiveGap = Math.min(gapDeg, fullAngle * 0.9);
+    const startAngle = startAngleFull + effectiveGap / 2;
+    const endAngle = endAngleFull - effectiveGap / 2;
+    const g = document.createElementNS(svgNS, "g");
+    g.setAttribute("class", "ellmain-thera-segment");
+    g.setAttribute("data-id", d.id);
+
+    const normalD = roundedWedgePath(startAngle, endAngle, outerR, innerR, CORNER_R);
+    const grownD = roundedWedgePath(startAngle, endAngle, outerR + GROW_AMOUNT, innerR, CORNER_R);
+
+    const path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", normalD);
+    path.setAttribute("fill", d.color);
+    path.setAttribute("stroke", "none");
+    path.style.setProperty("--ellmain-thera-d-normal", `path("${normalD}")`);
+    path.style.setProperty("--ellmain-thera-d-active", `path("${grownD}")`);
+    g.appendChild(path);
+
+    // leader line + dot + text — every line is the same fixed length and
+    // starts right at the ring's outer edge (no gap before the line), and
+    // the text continues straight out from the dot (no left/right jump).
+    const lineStart = polar(cx, cy, outerR, midAngle);
+    const lineEnd = polar(cx, cy, outerR + LEADER_LEN, midAngle);
+    const textPos = polar(cx, cy, outerR + LEADER_LEN + TEXT_GAP, midAngle);
+
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("class", "ellmain-thera-leader-line");
+    line.setAttribute("x1", lineStart.x);
+    line.setAttribute("y1", lineStart.y);
+    line.setAttribute("x2", lineEnd.x);
+    line.setAttribute("y2", lineEnd.y);
+    line.setAttribute("stroke", d.color);
+    line.setAttribute("stroke-width", 1.5);
+    g.appendChild(line);
+
+    const dot = document.createElementNS(svgNS, "circle");
+    dot.setAttribute("class", "ellmain-thera-leader-dot");
+    dot.setAttribute("cx", lineEnd.x);
+    dot.setAttribute("cy", lineEnd.y);
+    dot.setAttribute("r", 7.5);
+    dot.setAttribute("fill", d.color);
+    g.appendChild(dot);
+
+    const text = document.createElementNS(svgNS, "text");
+    text.setAttribute("class", "ellmain-thera-leader-text");
+    text.setAttribute("x", textPos.x);
+    text.setAttribute("y", textPos.y);
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("dominant-baseline", "middle");
+    text.textContent = d.percent + "%";
+    g.appendChild(text);
+
+    svg.appendChild(g);
+  });
+
+  // ---------- Legend ----------
+  const legendCol = document.getElementById("ellmainTheraLegendCol");
+  data.forEach((d) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "ellmain-thera-legend-item";
+    item.setAttribute("data-id", d.id);
+
+    const dot = document.createElement("span");
+    dot.className = "ellmain-thera-legend-dot";
+    dot.style.background = d.color;
+
+    const label = document.createElement("span");
+    label.className = "ellmain-thera-legend-label";
+    label.textContent = d.label;
+
+    item.appendChild(dot);
+    item.appendChild(label);
+    legendCol.appendChild(item);
+  });
+
+  // ---------- Interactivity ----------
+  let lockedId = null;
+
+  function setActive(id) {
+    root.querySelectorAll(".ellmain-thera-segment").forEach(el =>
+      el.classList.toggle("ellmain-thera-active", el.getAttribute("data-id") === id)
+    );
+    root.querySelectorAll(".ellmain-thera-legend-item").forEach(el =>
+      el.classList.toggle("ellmain-thera-active", el.getAttribute("data-id") === id)
+    );
+  }
+
+  function clearActive() {
+    root.querySelectorAll(".ellmain-thera-segment, .ellmain-thera-legend-item").forEach(el =>
+      el.classList.remove("ellmain-thera-active")
+    );
+  }
+
+  // .ellmain-thera-selected marks an actual click-selection (vs.
+  // .ellmain-thera-active, which just marks the hover cross-highlight) —
+  // that's what the legend-dot bump is keyed off of.
+  function setSelected(id) {
+    root.querySelectorAll(".ellmain-thera-legend-item").forEach(el =>
+      el.classList.toggle("ellmain-thera-selected", el.getAttribute("data-id") === id)
+    );
+  }
+
+  function clearSelected() {
+    root.querySelectorAll(".ellmain-thera-legend-item").forEach(el =>
+      el.classList.remove("ellmain-thera-selected")
+    );
+  }
+
+  // ---------- Selection modal ----------
+  // Opens on a real click (a "selection"), not on hover — hover still just
+  // grows the segment via setActive/.ellmain-thera-active above.
+  const modal = document.getElementById("ellmainTheraModal");
+  const modalCard = document.getElementById("ellmainTheraModalCard");
+  const modalTitle = document.getElementById("ellmainTheraModalTitle");
+  const modalList = document.getElementById("ellmainTheraModalList");
+  const modalClose = document.getElementById("ellmainTheraModalClose");
+
+  function openModal(id) {
+    const d = byId[id];
+    modalTitle.textContent = d.label;
+    modalList.innerHTML = "";
+    for (let i = 1; i <= 6; i++) {
+      const li = document.createElement("li");
+      li.textContent = "Condition " + i;
+      modalList.appendChild(li);
+    }
+    modal.classList.add("ellmain-thera-open");
+  }
+
+  function closeModal() {
+    modal.classList.remove("ellmain-thera-open");
+  }
+
+  // Clicks inside the modal shouldn't bubble to the document-level
+  // listener that deselects/closes everything.
+  modalCard.addEventListener("click", (e) => e.stopPropagation());
+  modalClose.addEventListener("click", (e) => {
+    e.stopPropagation();
+    lockedId = null;
+    clearActive();
+    clearSelected();
+    closeModal();
+  });
+
+  function attachHandlers(selector) {
+    root.querySelectorAll(selector).forEach((el) => {
+      const id = el.getAttribute("data-id");
+
+      el.addEventListener("mouseenter", () => {
+        if (!lockedId) setActive(id);
+      });
+      el.addEventListener("mouseleave", () => {
+        if (!lockedId) clearActive();
+      });
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (lockedId === id) {
+          lockedId = null;
+          clearActive();
+          clearSelected();
+          closeModal();
+        } else {
+          lockedId = id;
+          setActive(id);
+          setSelected(id);
+          openModal(id);
+        }
+      });
+    });
+  }
+
+  attachHandlers(".ellmain-thera-segment");
+  attachHandlers(".ellmain-thera-legend-item");
+
+  document.addEventListener("click", () => {
+    if (lockedId) {
+      lockedId = null;
+      clearActive();
+      clearSelected();
+      closeModal();
+    }
+  });
+})();
+</script>
